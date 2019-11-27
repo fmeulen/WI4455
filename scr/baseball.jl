@@ -17,7 +17,8 @@ n = [58,59,74,84,69,63,60,54,53,60,66,66,72,64,42,38,58]
 AB = [509,643,633,645,606,555,619,609,552,540,561,440,585,531,454,504,244]
 HR = [70,66,56,46,45,44,43,40,37,34,32,30,29,28,23,21,15]
 
-addfrank = true # in preseason frank did extremely well, though only 3 times at bat, each time this resulted in a homerun
+addfrank = true
+# in preseason frank did extremely well, though only 3 times at bat, each time this resulted in a homerun
 # during the season he was 500 times at bat, with 5 homeruns
 
 if addfrank
@@ -35,8 +36,6 @@ baseball = DataFrame(players=players,PS_AB=n,PS_HR=Y,S_AB=AB,S_HR=HR)
 logtargetμ(μ, y, n, θ, τsq) = logpdf(Binomial(n,ψ(μ)),y) + logpdf(Normal(θ,sqrt(τsq)), μ)
 
 
-
-
 function updateμ(y, n, μ, θ, τsq, tunePar)
   μᵒ = μ + tunePar * randn()
   logA = logtargetμ(μᵒ, y, n, θ, τsq) - logtargetμ(μ, y, n, θ, τsq)
@@ -50,7 +49,7 @@ function updateμ(y, n, μ, θ, τsq, tunePar)
 end
 
 N = length(Y)
-IT = 2000  # number of iterations
+IT = 5000  # number of iterations
 BI = div(IT,2)
 
 
@@ -123,19 +122,25 @@ baseball[:S_HR_mle] = baseball[:S_AB] .* baseball[:mle]
 @rput baseball
 R"""
 library(gridExtra)
-p1 <- ggplot(baseball, aes(x=players)) +
-  geom_point(aes(y = bayes, shape="Bayes",colour='Bayes'),size=2.5) +
-  geom_point(aes(y = mle, shape="mle",colour='mle'),size=2.5)+
-  theme_light() + theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),legend.position='none') +
-    ylab('probability') +ggtitle("Preseason data")+xlab("")
-p1
+library(forcats)
+theme_set(theme_light())
+baseball1 <- baseball %>% dplyr::select(players,bayes,mle) %>% gather(key="method",value="value",bayes,mle) %>%
+  mutate(method=fct_relevel(method, "mle", "bayes"))
 
-p2 = ggplot(baseball, aes(x=players)) +
-     geom_point(aes(y = S_HR_bayes, shape ="Bayes", colour="Bayes"),size=2.5)+
-  geom_point(aes(y = S_HR_mle, shape = "mle", colour="mle"),size=2.5)+
-  geom_point(aes(y = S_HR),shape=8,size=2.5)+theme_light()+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),legend.position='bottom') +
-    ylab('nr of homeruns') +ggtitle("Comparison predicted (using preseason data) and observed (season data)")
+p1 <- ggplot(baseball1, aes(x=players,y = value,colour=method,shape=method)) +
+  geom_point(size=2.5) +
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    ylab('probability') + ggtitle("Preseason: estimated probability of homerun") + xlab("")
+
+baseball2 <- baseball %>% dplyr::select(players, S_HR_mle, S_HR_bayes, S_HR) %>%
+      gather(key="type",value="value",S_HR_mle, S_HR_bayes, S_HR) %>%
+      mutate(type=fct_relevel(type, "S_HR_mle", "S_HR_bayes,S_HR"))
+
+p2 <-    ggplot(baseball2, aes(x= players, y = value, colour=type, shape=type)) +
+   geom_point(size=2.5)+
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    ylab('nr of homeruns') +ggtitle("Season: predicted and observed number of homeruns")
+show(p2)
 pdf('output-baseball_combined.pdf',width=8,height=8)
 grid.arrange(p1,p2,ncol=1)
 dev.off()
