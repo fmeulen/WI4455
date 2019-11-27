@@ -31,7 +31,8 @@ end
 baseball = DataFrame(players=players,PS_AB=n,PS_HR=Y,S_AB=AB,S_HR=HR)
 
 # functions for updating each element of μ
-ψ(x) = 1.0/(1.0 + exp(-x))
+clip(x; bound=10^(-12)) = max(min(x,1-bound),bound) #avoid numerical instability
+ψ(x) = clip(1.0/(1.0 + exp(-x)))
 #logtargetμ(μ, y, n, θ, τsq) = y*μ -  0.5*((μ-θ)^2)/τsq - n*log(1+exp(μ))
 logtargetμ(μ, y, n, θ, τsq) = logpdf(Binomial(n,ψ(μ)),y) + logpdf(Normal(θ,sqrt(τsq)), μ)
 
@@ -56,8 +57,8 @@ BI = div(IT,2)
 tunePar = 1.0 # tuning par for MH step updating μ (sd of normal distr)
 
 # prior hyperpars
-α =  0.001
-β = 0.001
+α =  0.01
+β = 0.01
 
 # save iterates in matrix and vectors
 μ = zeros(IT,N)
@@ -128,16 +129,17 @@ baseball1 <- baseball %>% dplyr::select(players,bayes,mle) %>% gather(key="metho
   mutate(method=fct_relevel(method, "mle", "bayes"))
 
 p1 <- ggplot(baseball1, aes(x=players,y = value,colour=method,shape=method)) +
-  geom_point(size=2.5) +
+  geom_point(size=2) +
     theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
     ylab('probability') + ggtitle("Preseason: estimated probability of homerun") + xlab("")
 
 baseball2 <- baseball %>% dplyr::select(players, S_HR_mle, S_HR_bayes, S_HR) %>%
       gather(key="type",value="value",S_HR_mle, S_HR_bayes, S_HR) %>%
-      mutate(type=fct_relevel(type, "S_HR_mle", "S_HR_bayes,S_HR"))
+      mutate(type=recode(type, S_HR_mle="mle", S_HR="observed", S_HR_bayes="bayes")) %>%
+      mutate(type=fct_relevel(type, "mle", "bayes", "observed"))
 
 p2 <-    ggplot(baseball2, aes(x= players, y = value, colour=type, shape=type)) +
-   geom_point(size=2.5)+
+   geom_point(size=2)+
     theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
     ylab('nr of homeruns') +ggtitle("Season: predicted and observed number of homeruns")
 show(p2)
