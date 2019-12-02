@@ -31,7 +31,7 @@ end
 baseball = DataFrame(players=players,PS_AB=n,PS_HR=Y,S_AB=AB,S_HR=HR)
 
 # functions for updating each element of μ
-clip(x; bound=10^(-12)) = max(min(x,1-bound),bound) #avoid numerical instability
+clip(x; bound=10^(-12)) = max(min(x,1.0-bound),bound) #avoid numerical instability
 ψ(x) = clip(1.0/(1.0 + exp(-x)))
 #logtargetμ(μ, y, n, θ, τsq) = y*μ -  0.5*((μ-θ)^2)/τsq - n*log(1+exp(μ))
 logtargetμ(μ, y, n, θ, τsq) = logpdf(Binomial(n,ψ(μ)),y) + logpdf(Normal(θ,sqrt(τsq)), μ)
@@ -50,7 +50,7 @@ function updateμ(y, n, μ, θ, τsq, tunePar)
 end
 
 N = length(Y)
-IT = 5000  # number of iterations
+IT = 15000  # number of iterations
 BI = div(IT,2)
 
 
@@ -153,3 +153,27 @@ performance_bayes = norm(baseball[:S_HR] - baseball[:S_HR_bayes])^2
 performance_mle = norm(baseball[:S_HR] - baseball[:S_HR_mle])^2
 println("sum-squared prediction error Bayes equals: ", round(performance_bayes,digits=0))
 println("sum-squared prediction error MLE equals: ", round(performance_mle;digits=0))
+
+# sample from predictive distribution of a player
+index = 8 # choose index of player
+@assert 1<=index<=N
+d_index = df_[!,Symbol("p$index")]  # get non-burnin iterates for the chosen player
+
+# sample from predictive distribution
+predicted =[rand(Binomial(AB[index], d_index[i])) for i in eachindex(d_index)]
+
+pred = DataFrame(x=predicted)
+playername = players[index]
+@rput playername
+@rput pred
+R"""
+print(playername)
+p <- pred %>% ggplot(aes(x=x)) + geom_histogram(bins=30,aes(y=..density..),fill='orange',colour='grey') +
+geom_density(aes(y=..density..)) +
+ ggtitle(paste0("Predictive density for player ",playername))+
+ xlab("")+ylab("")
+p
+pdf(paste0('output-baseball_predictive_',playername,'.pdf'),width=4,height=4)
+show(p)
+dev.off()
+"""
