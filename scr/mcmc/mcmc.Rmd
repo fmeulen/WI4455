@@ -1,0 +1,222 @@
+
+---
+title: "Statistical inference: MCMC methods"
+author: "Frank van der Meulen (TU Delft)"
+date: ""
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+setwd("~/.julia/dev/WI4455/scr/mcmc")
+library(tidyverse)
+library(gridExtra)
+```
+
+# SIMPLE EXAMPLE OF METROPOLIS-HASTINGS ALGORITHM
+
+Suppose we wish to simulate from the beta distribution.  We can do this with the Metropolis–Hastings algorithm, where the target density is the $\beta(a,b)$-distribution. Of course this is just an example for illustration, as there exist direct ways for simulating independent realisations of the beta distribution.
+
+## MH with independent $Unif(0,1)$-proposals. 
+```{r}
+  a=2.7; b=6.3; # choose parameters of the beta-distribution
+  
+  Nsim = 5000
+  X = c(runif(1), rep(0,Nsim-1))  # initialize the chain
+  acc = rep(0,Nsim)
+  for (i in 2:Nsim)
+  {
+    Y=runif(1)  # proposal
+    A=dbeta(Y,a,b)/dbeta(X[i-1],a,b)
+    acc[i-1] <- (runif(1)<A) 
+    X[i]=X[i-1] + (Y-X[i-1])*acc[i-1]
+  }
+  df = data.frame(iterate=1:Nsim, vals=X)
+  p1 = df %>% ggplot(aes(x=iterate, y=vals)) + geom_line()  + ylab("")
+  p2 = ggplot()  + geom_histogram(data=df, mapping=aes(x=vals,y=..density..), colour='white', bins=50) +  
+      xlab("") + ylab("") +
+      stat_function(data=data.frame(x=c(0,1)), mapping=aes(x), fun=function(x) dbeta(x,a,b),colour="orange", size=1.2)
+    
+  
+pdf('Beta-ind.pdf',width=7,height=4)
+grid.arrange(p1,p2)
+dev.off()
+cat('average acceptance probability equals: ',mean(acc))
+```
+
+## MH with smmetric random-walk MH proposals. 
+
+If $x$ is the current iterate, then propose $x+U(-\eta,\eta)$. Experiment yourself with different values for $\eta$. 
+```{r}
+  eta=10
+  X=rep(runif(1),Nsim)  # initialize the chain
+  acc=rep(0,Nsim)
+  for (i in 2:Nsim)
+  {
+    Y=X[i-1] + runif(1,-eta,eta)
+    A=dbeta(Y,a,b)/dbeta(X[i-1],a,b)
+    acc[i-1] <- (runif(1)<A) 
+    X[i]=X[i-1] + (Y-X[i-1])*acc[i-1]
+  }
+
+
+df = data.frame(iterate=1:Nsim, vals=X)
+p1 = df %>% ggplot(aes(x=iterate, y=vals)) + geom_line()  + ylab("")
+p2 = ggplot()  + geom_histogram(data=df, mapping=aes(x=vals,y=..density..), colour='white', bins=50) +  
+      xlab("") + ylab("") +
+      stat_function(data=data.frame(x=c(0,1)), mapping=aes(x), fun=function(x) dbeta(x,a,b),colour="orange", size=1.2)
+    
+  
+pdf('Beta-rw10.pdf',width=7,height=4)  
+grid.arrange(p1,p2)
+dev.off()
+cat('average acceptance probability equals: ',mean(acc))
+```
+
+# BASEBALL EXAMPLE, MODEL 2
+
+The data are
+```{r}
+players <- c('McGwire', 'Sosa', 'Griffey', 'Castilla', 'Gonzalez', 'Galaragga',  'Palmeiro', 
+'Vaughn',' Bonds', 'Bagwell', 'Piazza', 'Thome', 'Thomas','T. Martinez', 'Walker', 'Burks', 'Buhner')
+Y <- c(7,9,4,7,3,6,2,10,2,2,4,3,2,5,3,2,6)
+n <- c(58,59,74,84,69,63,60,54,53,60,66,66,72,64,42,38,58)
+AB <- c(509,643,633,645,606,555,619,609,552,540,561,440,585,531,454,504,244)
+HR <- c(70,66,56,46,45,44,43,40,37,34,32,30,29,28,23,21,15)
+print(baseball<-data.frame(players=players,PS_AB=n,PS_HR=Y,S_AB=AB,S_HR=HR))
+```
+
+
+We need the following 2 functions for updating the coefficients $\mu_i$, $i=1,\ldots, 17$. 
+```{r}
+logtargetMui <- function(Yi, ni, mui, th, tau2,tunePar)
+    Yi*mui-((mui-th)^2)/(2*tau2)-ni*log(1+exp(mui))
+
+updateMui <- function(Yi, ni, mui, th, tau2, tunePar)
+{
+  muiNew <- mui + tunePar * rnorm(1)
+  A <- exp(logtargetMui(Yi,ni,muiNew,th, tau2,tunePar)-
+             logtargetMui(Yi,ni,mui,th, tau2,tunePar))
+  ifelse (runif(1)<A, muiNew, mui)
+}
+```
+
+```{r}
+N <- length(Y)
+IT <- 10000  # number of iterations
+tunePar <- 1 # tuning par for MH step updating mu (sd of normal distr)
+
+# prior hyperpars
+alpha <- 0.001
+beta <- 0.001
+
+# save iterates in matrix and vectors
+mu <- matrix(0,IT,N)
+th <- rep(0,IT)
+tau2 <- rep(0,IT)
+
+# initialise
+mu[1,] <- rnorm(N,sd=5)  # arbitrary 
+th[1] <- rnorm(1)
+tau2[1] <-2
+
+# Gibbs sampler:
+for (it in 2:IT)
+{
+  # update mu
+  for (i in 1:N)
+  {  mu[it,i] <- updateMui(Y[i],n[i],mu[it-1,i],
+                           th[it-1],tau2[it-1],tunePar)  }
+  # update th
+  th[it] <- rnorm(1,mean(mu[it,]),sqrt(tau2[it-1]/N))
+  # update tau2
+  tau2[it] <- 1/(rgamma(1,shape=N/2+alpha, 
+                       rate=beta+.5*sum((mu[it,]-th[it])^2)))
+}  
+```
+
+Visualisation
+```{r}
+par(mfrow=c(3,2)) # make trace plots for th, tau2, mu1, mu2, mu3, mu4
+plot.ts(th);plot.ts(tau2)
+plot.ts(mu[,1]);plot.ts(mu[,2])
+plot.ts(mu[,3]);plot.ts(mu[,4])
+
+BI <- 1000 # discard first BI samples as BurnIn
+
+plot.ts(th[BI:IT]);plot.ts(tau2[BI:IT])
+plot.ts(mu[BI:IT,1]);plot.ts(mu[BI:IT,2])
+plot.ts(mu[BI:IT,3]);plot.ts(mu[BI:IT,4])
+
+# computate posterior means
+th.pm <- mean(th[BI:IT])
+tau2.pm <- mean(tau2[BI:IT])
+mu.pm <- colMeans(mu[BI:IT,])
+p.pm <- colMeans(1/(1+exp(-mu[BI:IT,])))
+
+print(th.pm)
+print(tau2.pm)
+print(mu.pm)
+```
+
+Add results to baseball dataframe
+```{r}
+baseball$bayes <- p.pm
+baseball$mle <- baseball$PS_HR/baseball$PS_AB # equals empirical fraction
+baseball
+library(ggplot2)
+p1 <- ggplot(baseball, aes(x=players)) + 
+  geom_point(aes(y = bayes, shape="Bayes"),size=2.5) + 
+  geom_point(aes(y = mle, shape="mle"),size=2.5)+
+  theme_minimal()+
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),legend.position='none') +ylab('probability') +ggtitle("Pre-season data")+xlab("")
+```
+
+Add predictions for season
+```{r}
+baseball$S_HR_Bayes <- baseball$S_AB * baseball$bayes
+baseball$S_HR_mle <- baseball$S_AB * baseball$mle
+baseball
+```
+
+Compare performance
+```{r}
+performance_Bayes = sum((baseball$S_HR-baseball$S_HR_Bayes)^2)
+performance_mle = sum((baseball$S_HR-baseball$S_HR_mle)^2)
+p2<- ggplot(baseball, aes(x=players)) + 
+     geom_point(aes(y = S_HR_Bayes, shape ="Bayes"),size=2.5)+
+  geom_point(aes(y = S_HR_mle, shape = "mle"),size=2.5)+
+  geom_point(aes(y = S_HR),shape=8,size=2.5,colour='blue')+theme_light()+
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),legend.position='bottom') +ylab('nr of homeruns') +ggtitle("Comparison predicted (using pre-season data) and observed (seasan data)")
+pdf('output-baseball_combined.pdf',width=8,height=8)
+grid.arrange(p1,p2,ncol=1)
+dev.off()
+
+cat('performance Bayes equals: ',performance_Bayes)
+cat('performance mle equals: ',performance_mle)
+```
+
+Compute predictive distributions
+```{r}
+ind <- seq(BI,IT,by=10) # use every 10-th iterate from non-burnin samples
+L <- length(ind)
+pred <- matrix(0,L,N)
+
+for (i in 1:N)
+{
+    for (j in 1:L)
+        pred[j,i] <- rbinom(1,AB[i], 1/(1+exp(-mu[ind[j],i])))
+}
+
+meanPred <- colMeans(pred)
+meanPred
+cat('Sum of squared prediction error equals: ',sum((meanPred-HR)^2))
+
+# plot for the i-th second player the predictive distr
+i<-16
+hist(pred[,i],breaks='FD',prob=TRUE, main='predictive distribution',xlab='',col='lightblue')
+lines(density(pred[,i]),lwd=2.5)
+```
+
+Note that the results are sensitive to the choice of hyperpars. $\alpha=\beta=0.01$ and $\alpha=\beta=0.001$ give quite different sum of squared prediction errors! 
