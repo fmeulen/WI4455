@@ -4,6 +4,8 @@ using Random
 using StatsPlots
 using NamedArrays
 using CSV
+using MCMCChains
+using DataFrames
 
 @model function dmn(y)
   counts =  sum(y, dims=2)
@@ -28,9 +30,11 @@ y = Matrix(d)
 
 # use No_U-Turn-Sampler
 chns = sample(dmn(y), HMC(0.01, 10), 1000)
+iters = DataFrame(chns, [:parameters])
+
 
 # default plot
-plot(chns)
+#plot(chns)
 
 # chns is of type Chains, type `?Chains` to see what is in and how to extract the info
 # for example, the vector of parameters is extracted via
@@ -41,11 +45,12 @@ a1iterates = chns[:a1].value.data[:,:,1][:,1]
 # Summary stas can be obtained directly via
 out = describe(chns)
 #out[1] and out[2] contain summary stats
-println(out[1][:mean])
+#println(out[1][:mean])
 
 # get iterates for pars a[1] and a[2]
 chns[[:a1,:a2]].value
 
+chns |> display
 
 """
     extract_iters(chns)
@@ -65,4 +70,6 @@ function extract_iters(chns)
 end
 
 iters = extract_iters(chns)
-plot(iters["a1",:], label="a2")
+plot(iters["a2",:], label="a2")
+plot(iters["a1",:], label="a1")
+plot(iters[14,:])
