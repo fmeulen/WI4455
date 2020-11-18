@@ -14,12 +14,14 @@ for (i in 1:n) x[i] <- runif(1,0,theta0[i])
 # compute estiamtes
 mle <- x
 ebayes <- x+mean(x)
-lambda_hyp <- 1 # hyperpar in prior
+lambda_hyp <- 0.010 # hyperpar in prior
 bayes <- x+1/lambda_hyp
 
-mse.mle <- sum((mle-theta0)^2)
-mse.ebayes <- sum((ebayes-theta0)^2)
-mse.bayes <- sum((bayes-theta0)^2)
+ss <- function(x) { sum(x^2) }
+
+mse.mle <- ss(mle-theta0)
+mse.ebayes <- ss(ebayes-theta0)
+mse.bayes <- ss(bayes-theta0)
 
 mse.mle
 mse.ebayes
@@ -50,14 +52,15 @@ for (it in 2:IT)
 }
 
 # postprocessing
-posteriormean <-   as.tibble(theta) %>% filter(row_number() > IT/2) %>% summarise_all(mean)
-posteriormean <- as.numeric(posteriormean[1,])
-mse.posteriormean <- sum((posteriormean-theta0)^2)
+bayeshier <-   as_tibble(theta) %>% filter(row_number() > IT/2) %>% 
+  summarise_all(mean)
+bayeshier <- as.numeric(bayeshier[1,])
+mse.bayeshier <- ss(bayeshier-theta0)
 
 mse.mle
 mse.ebayes
 mse.bayes
-mse.posteriormean
+mse.bayeshier
 
 
 dd <- data.frame(i=rep(1:n,4),value=
@@ -80,9 +83,3 @@ diterates %>% filter(row_number() %in% seq(1,IT,by=10)) %>% gather(key=par,value
      ggplot() + geom_path(aes(x=iterate,y=y)) + facet_grid(par~.,scales='free')+ ggtitle("traceplots for a few parameters")
  
 
-
-# # for an individual theta[i], mle may be better than Bayes
-# d2 <- data.frame(coef=1:n,mle=mle,posteriormean=posteriormean,true=theta0) %>%
-#   gather(key=type,value=y,mle,posteriormean,true)
-# d2  %>% filter(coef<10) %>% ggplot(aes(x=coef,y=y,colour=type))+
-#   geom_point()  + scale_x_continuous(breaks = seq(1, 10, by=1)) +   ggtitle("estimate-theta0") + ylab("")
