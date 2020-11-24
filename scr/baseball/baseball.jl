@@ -71,8 +71,8 @@ acc = Int[]
 acc_ = 0
 
 # Gibbs sampler:
-for it in 2:IT
-  for i in 1:N
+for it in 2:IT ∈
+  for i ∈ 1:N
     μ[it,i], acc_ = updateμ(Y[i],n[i],μ[it-1,i],θ[it-1],τsq[it-1],tunePar)
     push!(acc, acc_)
   end
@@ -86,7 +86,7 @@ end
 println("acceptance percentange MH-steps: ", round(100*sum(acc)/((IT-1)*N); digits=2))
 
 df = DataFrame(hcat(μ,θ,τsq))
-rename!(df, push!([Symbol("mu$i") for i in 1:N], :theta, :tausq))
+rename!(df, push!([Symbol("mu$i") for i ∈ 1:N], :theta, :tausq))
 
 @rput df
 @rput IT
@@ -102,13 +102,13 @@ dev.off()
 """
 
 # add p = 𝓌(μ)
-for i in 1:N
+for i ∈ 1:N
   df[!,Symbol("p$i")]= 𝓌.(df[!,Symbol("mu$i")])
 end
 # computate posterior means
 df_= df[BI:IT,:]
 
-postmean = [mean(col) for col in eachcol(df_)]
+postmean = [mean(col) for col ∈ eachcol(df_)]
 
 # add postmean and mle to dataframe
 baseball[!,:bayes] = postmean[end-N+1:end]
