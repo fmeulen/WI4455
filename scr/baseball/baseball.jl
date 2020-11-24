@@ -3,6 +3,7 @@ using RCall
 using Statistics
 using Distributions
 using LinearAlgebra
+using StatsFuns
 
 workdir = @__DIR__
 println(workdir)
@@ -31,11 +32,8 @@ end
 baseball = DataFrame(players=players,PS_AB=n,PS_HR=Y,S_AB=AB,S_HR=HR)
 
 # functions for updating each element of μ
-clip(x; bound=10^(-12)) = max(min(x,1.0-bound),bound) #avoid numerical instability
-ψ(x) = clip(1.0/(1.0 + exp(-x)))
-#logtargetμ(μ, y, n, θ, τsq) = y*μ -  0.5*((μ-θ)^2)/τsq - n*log(1+exp(μ))
-logtargetμ(μ, y, n, θ, τsq) = logpdf(Binomial(n,ψ(μ)),y) + logpdf(Normal(θ,sqrt(τsq)), μ)
-
+𝓌(x) = logistic(x)
+logtargetμ(μ, y, n, θ, τsq) = logpdf(Binomial(n,𝓌(μ)),y) + logpdf(Normal(θ,sqrt(τsq)), μ)
 
 function updateμ(y, n, μ, θ, τsq, tunePar)
   μᵒ = μ + tunePar * randn()
@@ -88,7 +86,7 @@ end
 println("acceptance percentange MH-steps: ", round(100*sum(acc)/((IT-1)*N); digits=2))
 
 df = DataFrame(hcat(μ,θ,τsq))
-names!(df, push!([Symbol("mu$i") for i in 1:N], :theta, :tausq))
+rename!(df, push!([Symbol("mu$i") for i in 1:N], :theta, :tausq))
 
 @rput df
 @rput IT
@@ -103,9 +101,9 @@ show(p)
 dev.off()
 """
 
-# add p = ψ(μ)
+# add p = 𝓌(μ)
 for i in 1:N
-  df[Symbol("p$i")]= ψ.(df[Symbol("mu$i")])
+  df[!,Symbol("p$i")]= 𝓌.(df[!,Symbol("mu$i")])
 end
 # computate posterior means
 df_= df[BI:IT,:]
@@ -113,12 +111,12 @@ df_= df[BI:IT,:]
 postmean = [mean(col) for col in eachcol(df_)]
 
 # add postmean and mle to dataframe
-baseball[:bayes] = postmean[end-N+1:end]
-baseball[:mle] = baseball[:PS_HR]./baseball[:PS_AB] # mle equals empirical fraction)
+baseball[!,:bayes] = postmean[end-N+1:end]
+baseball[!,:mle] = baseball[!,:PS_HR]./baseball[!,:PS_AB] # mle equals empirical fraction)
 
 # compute mean of predicted homeruns during season and add to dataframe
-baseball[:S_HR_bayes] = baseball[:S_AB] .* baseball[:bayes]
-baseball[:S_HR_mle] = baseball[:S_AB] .* baseball[:mle]
+baseball[!,:S_HR_bayes] = baseball[!,:S_AB] .* baseball[!,:bayes]
+baseball[!,:S_HR_mle] = baseball[!,:S_AB] .* baseball[!,:mle]
 
 @rput baseball
 R"""
