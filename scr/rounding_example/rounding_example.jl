@@ -11,17 +11,6 @@ histogram(y, label="observations"; normalize=true)
 mean(y.<1)
 mean(y.==2)
 
-lik <- function(th, x)
-{
-  if (x<min(1,th))
-  {
-    out <- 1
-  }  else {
-        
-  }
-  out/th
-}
-
 expec = function(θ)
     out = 0.5θ
     if θ > 1.0    
