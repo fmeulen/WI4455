@@ -26,6 +26,14 @@ plot(θg, expec.(θg), label="")
 
 # maximum likelihood estimation
 
+function ψ(x)
+    if isinteger(x)
+        return(1.0)
+    else 
+        return(x - floor(x))
+    end
+end
+
 """ 
     loglik(θ, y::Number)
 
@@ -36,7 +44,7 @@ function loglik(θ, y::Number)
     if y < min(1.0, θ) || (y <= ceil(θ)-1.0)
         ll = -log(θ)
     elseif y == ceil(θ)
-        ll = log(1.0 - floor(θ)/θ)
+        ll = log(ψ(θ)) - log(θ) 
     else
         ll = -Inf64
     end
@@ -60,16 +68,10 @@ ll(y) = θ -> loglik(θ,y)  # define loglik as function of θ
 
 
 maxy = maximum(y)
-loglik(4.0, y)
-loglik(4.001, y)
-loglik(4.99, y)
-
-# note the irregularity of the loglik
+loglik(maxy-1.0, y)
+loglik(maxy-0.999, y)
 loglik(maxy, y)
-ϵ = 0.001
-loglik(maxy + ϵ, y)
-loglik(maxy - ϵ, y)
 
-θs = range(2.0, 6.0, length = 10000)
+θs = range(2.0, maxy+3, length = 10000)
 out = ll(y).(θs)
-plot(θs, out, label="" ) # can't see irregularity at θ = maxy from the fig, maximum should be attained in (maxy-1, maxy)
+plot(θs, out, label="" ) # maximum should be attained in (maxy-1, maxy)
