@@ -71,7 +71,7 @@ acc = Int[]
 acc_ = 0
 
 # Gibbs sampler:
-for it in 2:IT ∈
+for it in 2:IT 
   for i ∈ 1:N
     μ[it,i], acc_ = updateμ(Y[i],n[i],μ[it-1,i],θ[it-1],τsq[it-1],tunePar)
     push!(acc, acc_)

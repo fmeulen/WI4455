@@ -64,7 +64,7 @@ mse.bayeshier
 
 
 dd <- data.frame(i=rep(1:n,4),value=
-                   c(mle-theta0,ebayes-theta0,bayes-theta0,posteriormean-theta0),
+                   c(mle-theta0,ebayes-theta0,bayes-theta0,bayeshier-theta0),
                  type=rep(c('mle','ebayes','bayes','hier.bayes'),each=n)) 
             
 
