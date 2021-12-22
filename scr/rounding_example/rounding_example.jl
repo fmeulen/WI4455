@@ -9,7 +9,7 @@ using Random
 h(x) =  x<1 ? x : ceil(x)
 
 θtrue = 4.4
-n = 100
+n = 500
 Random.seed!(13) # fix RNG
 x = rand(Uniform(0,θtrue), n)
 y = h.(x)
@@ -109,16 +109,18 @@ data_augmentation = function(y, prior; ITER=20_000)
    θs
 end
 
-
 # prior specification 
 θmin = 0.1
 prior = Pareto(2.0, θmin)
 print(mean(prior))
 θs = data_augmentation(y, prior)
-plot(θs)
+plot1 = plot(θs, label="")
 
 # remove  burnin (assess visually)
 BI = 1_000
-histogram(θs[BI:end])
+plot2 = histogram(θs[BI:end], label="")
 
+l = @layout [a ; b ]
+plot(plot1, plot2, layout=l)
+savefig("posteriorsamples.pdf")
 mean(θs[BI:end]) 
